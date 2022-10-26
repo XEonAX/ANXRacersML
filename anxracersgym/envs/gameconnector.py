@@ -3,10 +3,9 @@ import mmap
 import struct
 from threading import Lock, Thread
 from time import sleep
-from uuid import uuid4
-import uuid
 
-from GameState import GameState
+from anxracersgym.envs.gamestate import GameState
+
 
     # <MMAP>
     # 0-100 (Unicode) MemoryMapName = "ANXRacersGymInterface"
@@ -76,7 +75,7 @@ from GameState import GameState
     #         16-20 (float) W Rotation
     # </MMAP>
 
-class ANXRacersTelemetryClient:
+class ANXRacersMemoryMapClient:
     def __init__(self, tagname="ANXRacersGymInterface"):
         self.tagname = tagname
 
@@ -96,7 +95,6 @@ class ANXRacersTelemetryClient:
         # -1=AnonFile,10000=Size,tagName=mmapName
         with mmap.mmap(-1, 10000, self.tagname, access=mmap.ACCESS_WRITE) as mm:
             while True:
-                self.AccessReceived=True
                 self.__lock.acquire()
                 mm.seek(0)
                 data = mm.read(100)
@@ -190,10 +188,10 @@ class ANXRacersTelemetryClient:
 
                 mm.seek(418)
                 memResetCount, memGiveupCount = struct.unpack("ii", mm.read(8))
-                if self.ResetCount == 0:
+                if(self.AccessReceived==False):
                     self.ResetCount = memResetCount
-                if self.GiveupCount == 0:
                     self.GiveupCount = memGiveupCount
+
                 mm.seek(410)
                 mm.write(
                     struct.pack(
@@ -205,6 +203,7 @@ class ANXRacersTelemetryClient:
                     )
                 )
                 sleep(0.01)
+                self.AccessReceived=True
                 # print("=====================================")
 
     def retrieve_data(self):
@@ -248,4 +247,4 @@ class ANXRacersTelemetryClient:
 
 
 if __name__ == "__main__":
-    ANXRacersTelemetryClient()
+    ANXRacersMemoryMapClient()

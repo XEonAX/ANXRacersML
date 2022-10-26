@@ -1,19 +1,23 @@
 from math import fabs
 from time import sleep
-from rtgym import RealTimeGymInterface
-import GymClient
 import gym.spaces as spaces
 import gym
 import numpy as np
+from anxracersgym.envs.gameconnector import ANXRacersMemoryMapClient
+from anxracersgym.envs.gamestate import GameState
 
 
-class ANXRacersInterface(RealTimeGymInterface, gym.Env):
-    def __init__(self):
-        self.client = None
+class ANXRacersEnv(gym.Env):
+    def __init__(self, reactionTime=0.01):
+        super(ANXRacersEnv, self).__init__()
+        self.reactionTime = reactionTime
+        self.connector = None
         self.initialized = False
+        self.observation_space = self._get_observation_space()
+        self.action_space = self._get_action_space()
         pass
 
-    def get_observation_space(self):
+    def _get_observation_space(self):
         SpaceshipPosX = spaces.Box(low=-1.0, high=1.0, shape=(1,))
         SpaceshipPosY = spaces.Box(low=-1.0, high=1.0, shape=(1,))
         SpaceshipRotationZ = spaces.Box(low=-1.0, high=1.0, shape=(1,))
@@ -69,7 +73,7 @@ class ANXRacersInterface(RealTimeGymInterface, gym.Env):
         #         Sensor,
         #     )
         # )
-        return spaces.Tuple(
+        return spaces.Tuple(spaces=
             (
                 SpaceshipPosX,
                 SpaceshipPosY,
@@ -88,25 +92,20 @@ class ANXRacersInterface(RealTimeGymInterface, gym.Env):
             )
         )
 
-    def get_action_space(self):
+    def _get_action_space(self):
         return spaces.Box(low=-1.0, high=1.0, shape=(2,))
         pass
 
-    def get_default_action(self):
+    def _get_default_action(self):
         return np.array([0.0, 0.0], dtype="float32")
         pass
 
-    def send_control(self, control):
-        print(control)
-        self.client.set_inputs(control[0], control[1])
+    def _send_control(self, action):
+        print(action)
+        self.connector.set_inputs(action[0], action[1])
         pass
 
-    def reset(self):
-        if not self.initialized:
-            self.client = GymClient.ANXRacersTelemetryClient()
-            while self.client.AccessReceived == False:
-                print("waiting for access")
-            self.initialized = True
+    def _get_obs_rew_terminated_info(self):
         (
             level,
             LevelName,
@@ -118,8 +117,9 @@ class ANXRacersInterface(RealTimeGymInterface, gym.Env):
             SpaceshipState,
             trackState,
             Rayhits,
-        ) = self.client.retrieve_data()
-        return [
+        ) = self.connector.retrieve_data()
+
+        obs = (
             np.array([SpaceshipState[0]], dtype="float32"),
             np.array([SpaceshipState[1]], dtype="float32"),
             np.array([SpaceshipState[2]], dtype="float32"),
@@ -133,45 +133,68 @@ class ANXRacersInterface(RealTimeGymInterface, gym.Env):
             np.array([trackState[1]], dtype="float32"),
             np.array([trackState[2]], dtype="float32"),
             np.array([trackState[3]], dtype="float32"),
-        ], {}
-        pass
-
-    def get_obs_rew_terminated_info(self):
-        (
-            level,
-            LevelName,
-            SpaceshipPhysics,
-            ShipName,
-            UserDisplayName,
-            gameState,
-            UpdateNumber,
-            SpaceshipState,
-            trackState,
-            Rayhits,
-        ) = self.client.retrieve_data()
-
-        obs = [
-            np.array([SpaceshipState[0]], dtype="float32"),
-            np.array([SpaceshipState[1]], dtype="float32"),
-            np.array([SpaceshipState[2]], dtype="float32"),
-            np.array([SpaceshipState[3]], dtype="float32"),
-            np.array([SpaceshipState[4]], dtype="float32"),
-            np.array([SpaceshipState[5]], dtype="float32"),
-            np.array([SpaceshipState[6]], dtype="float32"),
-            np.array([SpaceshipState[7]], dtype="float32"),
-            np.array([SpaceshipState[8]], dtype="float32"),
-            np.array([trackState[0]], dtype="float32"),
-            np.array([trackState[1]], dtype="float32"),
-            np.array([trackState[2]], dtype="float32"),
-            np.array([trackState[3]], dtype="float32"),
-        ]
+        )
 
         rew = -np.linalg.norm(
             np.array([trackState[0], trackState[1]], dtype=np.float32)
         )
         terminated = rew > -0.01 / 100000
         info = {}
-        return obs, rew, terminated, info
+        return obs, rew, terminated, False, info
 
-    def wait(self):
-        self.send_control(self.get_default_action())
+    def _wait(self):
+        self._send_control(self._get_default_action())
+
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)
+        if not self.initialized:
+            self.connector = ANXRacersMemoryMapClient()
+            while self.connector.AccessReceived == False:
+                print("Waiting to connect to ANXRacers")
+                sleep(0.1)
+            self.initialized = True
+        self.connector.send_reset()
+        sleep(0.2)
+        while self.connector.gameState!=GameState.Racing:
+            print("Waiting for Race to start")
+            sleep(0.1)
+        (
+            level,
+            LevelName,
+            SpaceshipPhysics,
+            ShipName,
+            UserDisplayName,
+            gameState,
+            UpdateNumber,
+            SpaceshipState,
+            trackState,
+            Rayhits,
+        ) = self.connector.retrieve_data()
+        return (
+            np.array([SpaceshipState[0]], dtype="float32"),
+            np.array([SpaceshipState[1]], dtype="float32"),
+            np.array([SpaceshipState[2]], dtype="float32"),
+            np.array([SpaceshipState[3]], dtype="float32"),
+            np.array([SpaceshipState[4]], dtype="float32"),
+            np.array([SpaceshipState[5]], dtype="float32"),
+            np.array([SpaceshipState[6]], dtype="float32"),
+            np.array([SpaceshipState[7]], dtype="float32"),
+            np.array([SpaceshipState[8]], dtype="float32"),
+            np.array([trackState[0]], dtype="float32"),
+            np.array([trackState[1]], dtype="float32"),
+            np.array([trackState[2]], dtype="float32"),
+            np.array([trackState[3]], dtype="float32"),
+        ), {}
+        pass
+
+    def step(self, action):
+        self._send_control(action)
+        sleep(self.reactionTime)
+        return self._get_obs_rew_terminated_info()
+
+    def render(self):
+        pass
+
+    def close(self):
+        print("Trying to close anxracers env. Not Implemented")
+        pass
