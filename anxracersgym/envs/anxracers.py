@@ -20,6 +20,7 @@ class ANXRacersEnv(gym.Env):
         self.initialized = False
         self.observation_space = self._get_observation_space()
         self.action_space = self._get_action_space()
+        self.stuckForHowManyTicks = 0
         pass
 
     def _get_observation_space(self):
@@ -161,6 +162,7 @@ class ANXRacersEnv(gym.Env):
         )  # distance to next checkpoint
         rew += trackState[4] / level[0]  # checkpoints completed/total checkpoints
         terminated = trackState[4] / level[0] > 0.9
+        truncated = False
         if (
             magnitude([SpaceshipState[4], SpaceshipState[5], SpaceshipState[6]])
             == 0  # stuck somewhere
@@ -169,26 +171,28 @@ class ANXRacersEnv(gym.Env):
         ):
             rew = -10
             terminated = True
+            truncated = True
         info = {}
-        print(rew)
+        # print(rew,"\r")
+        # return obs, rew, terminated, truncated, info #uncomment for envchecker
         return obs, rew, terminated, info
 
     def _wait(self):
         self._send_control(self._get_default_action())
 
     def reset(self, seed=None, options=None):
-        # super().reset(seed=seed)
+        super().reset(seed=seed)
         if not self.initialized:
             self.connector = ANXRacersMemoryMapClient()
             while self.connector.AccessReceived == False:
-                print("Waiting to connect to ANXRacers")
+                print("Waiting to connect to ANXRacers", end="\r")
                 sleep(0.1)
             self.initialized = True
         self.connector.send_reset()
         sleep(0.2)
         while self.connector.gameState != GameState.Racing:
-            print("Waiting for Race to start")
-            sleep(0.1)
+            print("Waiting for Race to start",end="\r")
+            sleep(0.2)
         (
             level,
             LevelName,
@@ -216,23 +220,25 @@ class ANXRacersEnv(gym.Env):
         #     np.array([trackState[2]], dtype="float32"),
         #     np.array([trackState[3]], dtype="float32"),
         # ), {}
-        return np.array(
-            [
-                SpaceshipState[0],
-                SpaceshipState[1],
-                SpaceshipState[2],
-                SpaceshipState[3],
-                SpaceshipState[4],
-                SpaceshipState[5],
-                SpaceshipState[6],
-                SpaceshipState[7],
-                SpaceshipState[8],
-                trackState[0],
-                trackState[1],
-                trackState[2],
-                trackState[3],
-            ],
-            dtype="float32",
+        return (
+            np.array(
+                [
+                    SpaceshipState[0],
+                    SpaceshipState[1],
+                    SpaceshipState[2],
+                    SpaceshipState[3],
+                    SpaceshipState[4],
+                    SpaceshipState[5],
+                    SpaceshipState[6],
+                    SpaceshipState[7],
+                    SpaceshipState[8],
+                    trackState[0],
+                    trackState[1],
+                    trackState[2],
+                    trackState[3],
+                ],
+                dtype="float32",
+            ) #,{}, Uncomment for envchecker
         )
         pass
 

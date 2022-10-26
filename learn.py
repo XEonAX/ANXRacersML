@@ -8,5 +8,5 @@ model = SAC(
     verbose=1,
     tensorboard_log="./sac_anxracers_tensorboard/",
 )
-model.learn(total_timesteps=10000, log_interval=4)
+model.learn(total_timesteps=10000, log_interval=4, progress_bar=True)
 model.save("sac_racers")
