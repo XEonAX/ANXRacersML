@@ -98,113 +98,114 @@ class ANXRacersMemoryMapClient:
                 self.__lock.acquire()
                 mm.seek(0)
                 data = mm.read(100)
-                tagName = data.decode("UTF-8")
-                # print(tagName)  # prints tagname
-                mm.seek(100)
-                levelbytes = mm.read(100)
-                # levelId = uuid.UUID(bytes=struct.unpack("16c", levelbytes[0:16]))
-                # print(levelId)
-                self.level = (NoOfCheckpoints, Laps, Difficulty) = struct.unpack(
-                    "iif", levelbytes[16:28]
-                )
-                self.LevelName = levelbytes[28:].decode("UTF-8")
-                # print(self.level, self.LevelName)  # prints updatenumber
+                tagNameFromMmap = data.decode("UTF-8").rstrip("\x00")
+                if(tagNameFromMmap==self.tagname):
+                    # print(tagName)  # prints tagname
+                    mm.seek(100)
+                    levelbytes = mm.read(100)
+                    # levelId = uuid.UUID(bytes=struct.unpack("16c", levelbytes[0:16]))
+                    # print(levelId)
+                    self.level = (NoOfCheckpoints, Laps, Difficulty) = struct.unpack(
+                        "iif", levelbytes[16:28]
+                    )
+                    self.LevelName = levelbytes[28:].decode("UTF-8")
+                    # print(self.level, self.LevelName)  # prints updatenumber
 
-                mm.seek(200)
-                spaceshipPhysicsBytes = mm.read(100)
-                self.SpaceshipPhysics = (
-                    Mass,
-                    LDrag,
-                    ADrag,
-                    SurgeForward,
-                    SurgeBackward,
-                    Strafe,
-                    Torque,
-                    Radius,
-                    Friction,
-                    Bounce,
-                ) = struct.unpack("10f", spaceshipPhysicsBytes[16:56])
-                self.ShipName = spaceshipPhysicsBytes[56:].decode("UTF-8")
-                # print(self.SpaceshipPhysics, self.ShipName)
+                    mm.seek(200)
+                    spaceshipPhysicsBytes = mm.read(100)
+                    self.SpaceshipPhysics = (
+                        Mass,
+                        LDrag,
+                        ADrag,
+                        SurgeForward,
+                        SurgeBackward,
+                        Strafe,
+                        Torque,
+                        Radius,
+                        Friction,
+                        Bounce,
+                    ) = struct.unpack("10f", spaceshipPhysicsBytes[16:56])
+                    self.ShipName = spaceshipPhysicsBytes[56:].decode("UTF-8")
+                    # print(self.SpaceshipPhysics, self.ShipName)
 
-                mm.seek(300)
-                userBytes = mm.read(100)
-                # userId = uuid.UUID(bytes=struct.unpack("16c", userBytes[0:16]))
-                # print(userId)
-                self.UserDisplayName = userBytes[16:].decode("UTF-8")
-                # print(self.UserDisplayName)
+                    mm.seek(300)
+                    userBytes = mm.read(100)
+                    # userId = uuid.UUID(bytes=struct.unpack("16c", userBytes[0:16]))
+                    # print(userId)
+                    self.UserDisplayName = userBytes[16:].decode("UTF-8")
+                    # print(self.UserDisplayName)
 
-                mm.seek(400)
-                self.gameState = GameState(struct.unpack("i", mm.read(4))[0])
+                    mm.seek(400)
+                    self.gameState = GameState(struct.unpack("i", mm.read(4))[0])
 
-                mm.seek(512)
-                self.UpdateNumber = struct.unpack("i", mm.read(4))[0]
-                # print(self.UpdateNumber)
+                    mm.seek(512)
+                    self.UpdateNumber = struct.unpack("i", mm.read(4))[0]
+                    # print(self.UpdateNumber)
 
-                mm.seek(520)
+                    mm.seek(520)
 
-                spaceshipStateBytes = mm.read(36)
-                self.SpaceshipState = (
-                    PosX,
-                    PosY,
-                    RotationZ,
-                    RotationX,
-                    VelocityX,
-                    VelocityY,
-                    AngularVelocity,
-                    InputY,
-                    InputZ,
-                ) = struct.unpack("9f", spaceshipStateBytes)
-                # print(self.SpaceshipState)
-
-                mm.seek(560)
-                trackStateBytes = mm.read(20)
-                self.trackState = (
-                    RelPosX,
-                    RelPosY,
-                    CheckpointRotationZ,
-                    CheckpointRotationW,
-                    CheckpointIndex,
-                ) = struct.unpack("ffffi", trackStateBytes)
-                # print(self.trackState)
-
-                mm.seek(600)
-                self.Rayhits = []
-                for x in range(24 * 5):
-                    RayhitBytes = mm.read(20)
-                    RayHit = (
-                        Hit,
-                        IsObstacle,
-                        IsProp,
-                        IsTrack,
-                        ObjType,
-                        Distance,
+                    spaceshipStateBytes = mm.read(36)
+                    self.SpaceshipState = (
+                        PosX,
+                        PosY,
                         RotationZ,
                         RotationX,
-                    ) = struct.unpack("????ifff", RayhitBytes)
-                    self.Rayhits.append(RayHit)
-                    # print(self.RayHit)
-                self.__lock.release()
+                        VelocityX,
+                        VelocityY,
+                        AngularVelocity,
+                        InputY,
+                        InputZ,
+                    ) = struct.unpack("9f", spaceshipStateBytes)
+                    # print(self.SpaceshipState)
 
-                mm.seek(418)
-                memResetCount, memGiveupCount = struct.unpack("ii", mm.read(8))
-                if(self.AccessReceived==False):
-                    self.ResetCount = memResetCount
-                    self.GiveupCount = memGiveupCount
+                    mm.seek(560)
+                    trackStateBytes = mm.read(20)
+                    self.trackState = (
+                        RelPosX,
+                        RelPosY,
+                        CheckpointRotationZ,
+                        CheckpointRotationW,
+                        CheckpointIndex,
+                    ) = struct.unpack("ffffi", trackStateBytes)
+                    # print(self.trackState)
 
-                mm.seek(410)
-                mm.write(
-                    struct.pack(
-                        "ffii",
-                        self.Inputs[0],
-                        self.Inputs[1],
-                        self.ResetCount,
-                        self.GiveupCount,
+                    mm.seek(600)
+                    self.Rayhits = []
+                    for x in range(24 * 5):
+                        RayhitBytes = mm.read(20)
+                        RayHit = (
+                            Hit,
+                            IsObstacle,
+                            IsProp,
+                            IsTrack,
+                            ObjType,
+                            Distance,
+                            RotationZ,
+                            RotationX,
+                        ) = struct.unpack("????ifff", RayhitBytes)
+                        self.Rayhits.append(RayHit)
+                        # print(self.RayHit)
+                    self.__lock.release()
+
+                    mm.seek(418)
+                    memResetCount, memGiveupCount = struct.unpack("ii", mm.read(8))
+                    if(self.AccessReceived==False):
+                        self.ResetCount = memResetCount
+                        self.GiveupCount = memGiveupCount
+
+                    mm.seek(410)
+                    mm.write(
+                        struct.pack(
+                            "ffii",
+                            self.Inputs[0],
+                            self.Inputs[1],
+                            self.ResetCount,
+                            self.GiveupCount,
+                        )
                     )
-                )
-                sleep(0.01)
-                self.AccessReceived=True
-                # print("=====================================")
+                    sleep(0.01)
+                    self.AccessReceived=True
+                    # print("=====================================")
 
     def retrieve_data(self):
         return (
